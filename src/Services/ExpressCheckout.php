@@ -15,7 +15,6 @@ class ExpressCheckout
     use PayPalAPIRequest;
     use PayPalTransactions;
     use RecurringProfiles;
-
     /**
      * ExpressCheckout constructor.
      *
@@ -72,13 +71,28 @@ class ExpressCheckout
      */
     protected function setCartItems($items)
     {
-        return (new Collection($items))->map(static function ($item, $num) {
-            return [
-                'L_PAYMENTREQUEST_0_NAME'.$num  => $item['name'],
-                'L_PAYMENTREQUEST_0_AMT'.$num   => $item['price'],
-                'L_PAYMENTREQUEST_0_DESC'.$num  => isset($item['desc']) ? $item['desc'] : null,
-                'L_PAYMENTREQUEST_0_QTY'.$num   => isset($item['qty']) ? $item['qty'] : 1,
+        $payAction = $this->paymentAction;
+        $curr = $this->currency;
+
+        return (new Collection($items))->map(static function ($item, $num) use ($payAction, $curr ) {
+
+            $retorno = [
+                'PAYMENTREQUEST_'. $num . '_ITEMAMT'       => $item['price'],
+                'PAYMENTREQUEST_'. $num . '_AMT'           => $item['price'],
+                'PAYMENTREQUEST_'. $num . '_PAYMENTACTION' => $payAction,
+                'PAYMENTREQUEST_'. $num . '_CURRENCYCODE'  => $curr,
+                'PAYMENTREQUEST_'. $num . '_DESC'          => $item['name'],
+                'PAYMENTREQUEST_'. $num . '_INVNUM'        => $item['invoice_id'],
+                'PAYMENTREQUEST_'. $num . '_SELLERPAYPALACCOUNTID'        => $item['seller_account'],
+                'PAYMENTREQUEST_'. $num . '_PAYMENTREQUESTID'        => $item['invoice_id'],
+                'L_PAYMENTREQUEST_'. $num . '_NAME0'  => $item['name'],
+                'L_PAYMENTREQUEST_'. $num . '_AMT0'   => $item['price'],
+                'L_PAYMENTREQUEST_'. $num . '_DESC0'  => isset($item['desc']) ? $item['desc'] : null,
+                'L_PAYMENTREQUEST_'. $num . '_QTY0'   => isset($item['qty']) ? $item['qty'] : 1,
             ];
+
+            return $retorno;
+
         })->flatMap(static function ($value) {
             return $value;
         });
@@ -100,13 +114,13 @@ class ExpressCheckout
         }
 
         // Send L_BILLINGTYPE0 and L_BILLINGAGREEMENTDESCRIPTION0 only if there is billing type
-        if (isset($billingType)) {
-            $this->post = $this->post->merge([
-                'L_BILLINGTYPE0'                 => $billingType,
-                'L_BILLINGAGREEMENTDESCRIPTION0' => !empty($data['subscription_desc']) ?
-                    $data['subscription_desc'] : $data['invoice_description'],
-            ]);
-        }
+//        if (isset($billingType)) {
+//            $this->post = $this->post->merge([
+//                'L_BILLINGTYPE0'                 => $billingType,
+//                'L_BILLINGAGREEMENTDESCRIPTION0' => !empty($data['subscription_desc']) ?
+//                    $data['subscription_desc'] : $data['invoice_description'],
+//            ]);
+//        }
     }
 
     /**
@@ -181,12 +195,6 @@ class ExpressCheckout
         $this->setItemSubTotal($data);
 
         $this->post = $this->setCartItems($data['items'])->merge([
-            'PAYMENTREQUEST_0_ITEMAMT'       => $this->subtotal,
-            'PAYMENTREQUEST_0_AMT'           => $data['total'],
-            'PAYMENTREQUEST_0_PAYMENTACTION' => $this->paymentAction,
-            'PAYMENTREQUEST_0_CURRENCYCODE'  => $this->currency,
-            'PAYMENTREQUEST_0_DESC'          => $data['invoice_description'],
-            'PAYMENTREQUEST_0_INVNUM'        => $data['invoice_id'],
             'NOSHIPPING'                     => 1,
             'RETURNURL'                      => $data['return_url'],
             'CANCELURL'                      => $data['cancel_url'],
@@ -246,13 +254,6 @@ class ExpressCheckout
         $this->post = $this->setCartItems($data['items'])->merge([
             'TOKEN'                          => $token,
             'PAYERID'                        => $payerId,
-            'PAYMENTREQUEST_0_ITEMAMT'       => $this->subtotal,
-            'PAYMENTREQUEST_0_AMT'           => $data['total'],
-            'PAYMENTREQUEST_0_PAYMENTACTION' => !empty($this->config['payment_action']) ? $this->config['payment_action'] : 'Sale',
-            'PAYMENTREQUEST_0_CURRENCYCODE'  => $this->currency,
-            'PAYMENTREQUEST_0_DESC'          => $data['invoice_description'],
-            'PAYMENTREQUEST_0_INVNUM'        => $data['invoice_id'],
-            'PAYMENTREQUEST_0_NOTIFYURL'     => $this->notifyUrl,
         ]);
 
         $this->setTaxAmount($data);
